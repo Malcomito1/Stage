@@ -1,0 +1,40 @@
+# Base44 development environment for the Stage robot simulator.
+#
+# Stage is a native C++/FLTK/OpenGL application, not a web app. It is compiled
+# from the bind-mounted source inside the container and its real GUI is served
+# to the browser through noVNC on port 3000.
+#
+#   docker compose -f docker-compose.base44.yml up -d --build
+#
+# Source edits require a rebuild: `docker compose -f docker-compose.base44.yml
+# restart stage` (the entrypoint rebuilds and restarts the simulator).
+services:
+  stage:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    working_dir: /src
+    command: ["sh", "/src/docker/entrypoint.sh"]
+    environment:
+      # Which world file the simulator runs. Change it here (or in .env) to
+      # load a different simulation.
+      - STAGE_WORLD=${STAGE_WORLD:-worlds/simple.world}
+      - STAGE_BUILD_DIR=/build
+    volumes:
+      # The app is compiled from this working copy - never from a prebuilt image.
+      - ./:/src
+      # CMake build dir, kept out of the source tree but cached across restarts.
+      - stage-build:/build
+    ports:
+      # Browser entry point: noVNC viewer for the Stage GUI.
+      - "3000:3000"
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "sh", "/src/docker/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 600s
+
+volumes:
+  stage-build:
